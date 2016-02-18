@@ -1,0 +1,95 @@
+library(stats) 
+library(MASS) 
+library(nnet) 
+
+#import BOSTON dataset
+data("Boston") # data() is used to import dataset from a package
+str(Boston) # tell brief structure of the dataset i.e. number of variables, type of variables and values in them
+summary(Boston) # 5 point summary of each variable
+View(Boston) # view the Boston dataset in another window
+names(Boston) # column or variable names
+dim(Boston) # tells the dimensions of the dataset i.e. how many number of rows and columns
+
+#generates the training and test dataset
+sample_index = sample(nrow(Boston),nrow(Boston)*0.8) 
+Boston_Training = Boston[sample_index,]  # training dataset
+Boston_testing = Boston[-sample_index,] # Testing dataset
+summary(Boston_Training)
+
+#plots
+cor(Boston_Training) # correlation matrix
+plot(Boston_Training) # same as pairs
+boxplot(Boston_Training) #
+pairs(Boston_Training) # pair wise correlation
+
+#Model fitting
+Model1 = lm(medv~. , data = Boston_Training)
+SM=summary(Model1)
+MSE = mean(SM$residuals^2)
+Model1$coefficients
+AIC(Model1)
+BIC(Model1)
+
+#finding the variables by best subsets methods
+library(leaps)
+subset_result = regsubsets(medv~. , data = Boston_Training, nbest = 2, nvmax = 14)
+summary(subset_result)
+plot(subset_result, scale = 'bic')
+plot(subset_result, scale = 'r2')
+plot(subset_result, scale = 'adjr2')
+
+#**************setpwise***************
+
+#backward
+nullmodel = lm(medv~1, data = Boston_Training) #setting staring pt, lm only includes intercept
+fullmodel = lm(medv~., data = Boston_Training) #setting starting pt, lm in cludes all independent variables
+
+model.step1 = step(fullmodel, direction= 'backward') #subtract variable based on AIC
+
+#forward
+model.step2 = step(nullmodel, scope = list(lower = nullmodel, upper = fullmodel), direction = 'forward') # added in variabel based on AIC
+
+#both
+model.step3  = step(nullmodel, scope = list(lower = nullmodel, upper = fullmodel), direction = 'both') #added-in and subtract variables based on AIC
+
+Model2 = lm(medv ~ lstat + rm + ptratio + dis + nox + chas + black + zn + rad + crim + tax, data = Boston_Training)
+sm1 =summary(Model2)
+MSE1 = mean(sm1$residuals^2)
+
+#Diagonostic plots
+plot(Model2)
+
+#*****************Measuring the performance of the model generated********************#
+#Out of Sample prediction
+pi = predict(Model2, Boston_testing)
+#MSE of out of sample data
+mean((pi - Boston_testing$medv)^2)
+
+#5 fold cross validation
+library(boot)
+Model3 = glm(medv ~ lstat + rm + ptratio + dis + nox + chas + black + zn + rad + crim + tax, data = Boston)
+cv.glm(data = Boston, glmfit = Model3, K = 5)$delta[2]
+
+#*******************fitting a regression tree*****************************************#
+library(rpart)
+boston.rpart <- rpart(formula = medv ~ lstat + rm + ptratio + dis + nox + chas + black + zn + rad + crim + tax, data = Boston_Training)
+boston.rpart
+
+#plot regression tree with text labels
+plot(boston.rpart)
+text(boston.rpart)
+
+#in sample and out of sample performance with regression tree
+boston.train.pred.tree = predict(boston.rpart) #in sample
+boston.test.pred.tree = predict(boston.rpart, Boston_testing) #out of sample
+mean((boston.test.pred.tree - Boston_testing$medv)^2)
+
+
+#comparison of out of sample performance from linear model with tree on the basis of SSE
+boston.reg = lm(medv ~ lstat + rm + ptratio + dis + nox + chas + black + zn + rad + crim + tax, data = Boston_Training)
+boston.test.pred.reg = predict(boston.reg, Boston_testing)
+mean((boston.test.pred.reg - Boston_testing$medv)^2)
+
+# out of sample SSE for linear model is 17.30 whereas out of sample SSE for regression tree is 10.93 . Hence, CART is better for this case
+
+
